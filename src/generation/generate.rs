@@ -2249,8 +2249,7 @@ fn gen_conditional_expr<'a>(node: &CondExpr<'a>, context: &mut Context<'a>) -> P
   };
   let mut force_test_cons_newline =
     has_newline_test_cons && (!context.config.conditional_expression_prefer_single_line || use_new_lines_for_nested_conditional);
-  let mut force_cons_alt_newline =
-    has_newline_cons_alt && (!context.config.conditional_expression_prefer_single_line || use_new_lines_for_nested_conditional);
+  let mut force_cons_alt_newline = has_newline_cons_alt && (!context.config.conditional_expression_prefer_single_line || use_new_lines_for_nested_conditional);
   if line_per_expression && (force_test_cons_newline || force_cons_alt_newline) {
     // for line per expression, if one is true then both should be true
     force_test_cons_newline = true;
@@ -5415,7 +5414,7 @@ fn gen_array_type<'a>(node: &TsArrayType<'a>, context: &mut Context<'a>) -> Prin
   items
 }
 
-fn gen_conditional_type<'a>(node: &'a TsConditionalType, context: &mut Context<'a>) -> PrintItems {
+fn gen_conditional_type<'a>(node: &'a TsConditionalType<'a>, context: &mut Context<'a>) -> PrintItems {
   let top_most_data = get_top_most_data(node, context);
   let is_parent_conditional_type = node.parent().kind() == NodeKind::TsConditionalType;
   let line_per_expression = context.config.conditional_type_line_per_expression;
@@ -5484,11 +5483,16 @@ fn gen_conditional_type<'a>(node: &'a TsConditionalType, context: &mut Context<'
       items
     }
     .into_rc_path();
-    if_true_or(
-      "isStartOfLineIndentElseQueue",
-      condition_resolvers::is_start_of_line(),
-      with_indent(inner_items.into()),
-      with_queued_indent(inner_items.into()),
+    
+    Condition::new(
+      "isStartOfLineAndTopLevelOrNestedConditionalIndentElseQueue",
+      ConditionProperties {
+        condition: Rc::new(move |context| {
+          Some(context.writer_info.is_start_of_line() && (!is_parent_conditional_type || use_new_lines_for_nested_conditional))
+        }),
+        true_path: Some(with_indent(inner_items.into())),
+        false_path: Some(with_queued_indent(inner_items.into())),
+      },
     )
   });
 
